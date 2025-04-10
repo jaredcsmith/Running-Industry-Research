@@ -25,6 +25,7 @@ st.markdown("""
         .stDataFrame {
             width: 100%;
         }
+        
         .big-font {
             font-size: 24px !important;
             font-weight: bold;
@@ -93,6 +94,8 @@ st.markdown("""
             color: var(--primary-color) !important;
             opacity: 0.8;
         }
+            
+
     </style>
 """, unsafe_allow_html=True)
 
@@ -122,7 +125,35 @@ running_data = df[df['Category'] == 'Running'].copy()
 
 # Sidebar
 with st.sidebar:
-    # st.image("https://static.streamlit.io/examples/runner.jpg", width=100)
+    st.markdown("""
+    <style>
+        [data-testid="stSidebar"] {
+            color: gray;
+            border: 1px solid #dcdcdc;
+            border-radius: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .stButton > button {
+            background-color: #007bff;
+            color: gray;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .stButton > button:hover {
+            background-color: #0056b3;
+        }
+        .stSelectbox > div {
+            border: 1px solid gray;
+            border-radius: 5px;
+            padding: 5px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.title("Running Industry Research 👟")
     st.markdown("### Explore the latest trends in the running footwear market")
 
@@ -165,7 +196,6 @@ with st.sidebar:
     col1, col2 = st.columns(2)
     col1.metric("Number of Products", f"{total_products:.0f}")
     col2.metric("Avg. Rating", f"{avg_rating:.1f}")
-    # st.metric("Most Common Brand", top_brand)
     
     # Download option
     st.download_button(
