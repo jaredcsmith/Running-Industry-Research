@@ -12,6 +12,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Replace the current custom styling section with:
+
 # Custom styling
 st.markdown("""
     <style>
@@ -26,25 +28,31 @@ st.markdown("""
         .big-font {
             font-size: 24px !important;
             font-weight: bold;
+            color: var(--text-color);
         }
         .medium-font {
             font-size: 18px !important;
+            color: var(--text-color);
         }
         .insight-box {
-            background-color: #2c3e50;
-            border-radius: 10px;
+            background-color: #f7f7f7; /* Subtle gray background */
+            border-radius: 10px; /* Rounded corners */
+            border: 1px solid #dcdcdc; /* Light gray border */
             padding: 10px;
             margin-bottom: 10px;
         }
         .header-style {
-            background-color: #2c3e50;
+            background-color: #f7f7f7; /* Subtle gray background */
+            border-radius: 10px; /* Rounded corners */
+            border: 1px solid #dcdcdc; /* Light gray border */
             padding: 10px;
-            border-radius: 5px;
             margin-bottom: 15px;
         }
         /* Custom metric styling */
         .metric-container {
-            background: #f0f2f6;
+            background: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--primary-color);
             border-radius: 7px;
             padding: 15px;
             text-align: center;
@@ -52,13 +60,38 @@ st.markdown("""
         }
         .metric-label {
             font-size: 14px;
-            color: #586069;
+            color: var(--text-color);
             margin-bottom: 5px;
         }
         .metric-value {
             font-size: 24px;
             font-weight: bold;
-            color: #24292e;
+            color: var(--text-color);
+        }
+        
+        /* Dark mode specific overrides */
+        [data-testid="stSidebar"] {
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        
+        /* Make text in markdown elements readable in both modes */
+        .element-container {
+            color: var(--text-color);
+        }
+        
+        /* Ensure box backgrounds are visible but not too strong */
+        .insight-box, .header-style {
+            background-color: color-mix(in srgb, var(--background-color) 95%, var(--primary-color) 5%);
+        }
+        
+        /* Style links appropriately for both modes */
+        a {
+            color: var(--primary-color) !important;
+        }
+        a:hover {
+            color: var(--primary-color) !important;
+            opacity: 0.8;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -89,7 +122,7 @@ running_data = df[df['Category'] == 'Running'].copy()
 
 # Sidebar
 with st.sidebar:
-    st.image("https://static.streamlit.io/examples/runner.jpg", width=100)
+    # st.image("https://static.streamlit.io/examples/runner.jpg", width=100)
     st.title("Running Industry Research 👟")
     st.markdown("### Explore the latest trends in the running footwear market")
 
