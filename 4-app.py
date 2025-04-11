@@ -612,8 +612,11 @@ with row1_col2:
 
 
 # Plot 1: Feature Distribution by Pace and Rating
+# Replace the plotting section in row2_col1 with:
+
 with row2_col1:
     if selected_feature in plot_data.columns:
+        # Debug prints to understand data distribution
         st.markdown(f"### {selected_feature} Distribution by Performance Category")
         
         # Add insights box
@@ -625,61 +628,90 @@ with row2_col1:
         </div>
         """, unsafe_allow_html=True)
         
-        # Create the plot
-        grouped_data = plot_data.groupby(['Pace', 'Rating Category'])[selected_feature].apply(list).unstack()
+        # Create the plot with modified grouping
         fig, ax = plt.subplots(figsize=(6, 4))
-        positions = []
-        labels = []
-        colors = ['#FF5A5F', '#FFC107', '#4CAF50']  # More professional colors for Low, Medium, High
         
-        # Add color indicators above the plot
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(
-            f"<div style='background:{colors[0]}; padding:8px; border-radius:5px; color:white; text-align:center;'>"
-            f"<b>Low Rating (<75)</b>"
-            f"</div>",
-            unsafe_allow_html=True
-            )
-        with col2:
-            st.markdown(
-            f"<div style='background:{colors[1]}; padding:8px; border-radius:5px; color:white; text-align:center;'>"
-            f"<b>Medium Rating (75-90)</b>"
-            f"</div>",
-            unsafe_allow_html=True
-            )
-        with col3:
-            st.markdown(
-            f"<div style='background:{colors[2]}; padding:8px; border-radius:5px; color:white; text-align:center;'>"
-            f"<b>High Rating (90+)</b>"
-            f"</div>",
-            unsafe_allow_html=True
-            )
-            
-        for i, (rating_category, color) in enumerate(zip(grouped_data.columns, colors)):
-            for j, pace in enumerate(grouped_data.index):
-                data = grouped_data.loc[pace, rating_category]
-                if not (pd.isna(data) if isinstance(data, (float, int, str)) else pd.isna(data).any()):
-                    positions.append(j + i * 0.2)  # Offset positions for each category
-                    ax.boxplot(
-                        data, 
-                        positions=[j + i * 0.2], 
-                        widths=0.15, 
-                        patch_artist=True, 
-                        boxprops=dict(facecolor=color, color='black'), 
-                        whiskerprops=dict(color='black'), 
-                        capprops=dict(color='black'), 
-                        medianprops=dict(color='black')
+        # Define categories explicitly to ensure consistent order
+        rating_categories = ['Low (<75)', 'Medium (75-90)', 'High (90+)']
+        pace_categories = ['Daily Running', 'Tempo', 'Competition']
+        colors = ['#FF5A5F', '#FFC107', '#4CAF50']
+        
+        # Modified grouping approach
+        grouped_data = []
+        for pace in pace_categories:
+            for rating in rating_categories:
+                data = plot_data[
+                    (plot_data['Pace'] == pace) & 
+                    (plot_data['Rating Category'] == rating)
+                ][selected_feature].dropna().tolist()
+                
+                if len(data) > 0:  # Only add if we have data
+                    grouped_data.append({
+                        'Pace': pace,
+                        'Rating': rating,
+                        'Data': data
+                    })
+        
+        # Plot each category
+        positions = []
+        for i, rating in enumerate(rating_categories):
+            for j, pace in enumerate(pace_categories):
+                current_data = [g['Data'] for g in grouped_data 
+                              if g['Pace'] == pace and g['Rating'] == rating]
+                
+                if current_data and len(current_data[0]) > 0:
+                    pos = j + i * 0.25  # Increased spacing between categories
+                    positions.append(pos)
+                    
+                    # Create boxplot
+                    bplot = ax.boxplot(
+                        current_data,
+                        positions=[pos],
+                        widths=0.15,
+                        patch_artist=True,
+                        boxprops=dict(facecolor=colors[i], color='black', alpha=0.7),
+                        whiskerprops=dict(color='black'),
+                        capprops=dict(color='black'),
+                        medianprops=dict(color='white', linewidth=1.5),
+                        flierprops=dict(marker='o', markerfacecolor=colors[i], markersize=4)
                     )
-            labels.append(rating_category)
-            
-        ax.set_xticks(range(len(grouped_data.index)))
-        ax.set_xticklabels(grouped_data.index, rotation=45)
+        
+        # Add color indicators above plot
+        col1, col2, col3 = st.columns(3)
+        for col, color, label in zip([col1, col2, col3], colors, rating_categories):
+            with col:
+                st.markdown(
+                f"<div style='background:{color}; padding:8px; border-radius:5px; color:white; text-align:center;'>"
+                f"<b>{label}</b>"
+                f"</div>",
+                unsafe_allow_html=True
+                )
+        
+        # Customize plot
+        ax.set_xticks([i + 0.25 for i in range(len(pace_categories))])
+        ax.set_xticklabels(pace_categories, rotation=45)
         ax.set_xlabel("Performance Category", fontweight='bold')
         ax.set_ylabel(selected_feature, fontweight='bold')
         ax.grid(axis='y', linestyle='--', alpha=0.7)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
+        
+        # Add data counts as text
+        for pace in pace_categories:
+            for i, rating in enumerate(rating_categories):
+                count = len(plot_data[
+                    (plot_data['Pace'] == pace) & 
+                    (plot_data['Rating Category'] == rating)
+                ])
+                if count > 0:
+                    ax.text(
+                        pace_categories.index(pace) + i * 0.25,
+                        ax.get_ylim()[0],
+                        f'n={count}',
+                        horizontalalignment='center',
+                        verticalalignment='top',
+                        fontsize=8
+                    )
         
         plt.tight_layout()
         st.pyplot(fig)
