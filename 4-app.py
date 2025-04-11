@@ -104,7 +104,8 @@ st.markdown("""
 def load_data():
     df = pd.read_csv('FootwearData_cleaned.csv')
     df = df[(df['Brand'] != 'Jordan') & (df['Brand'] != 'Kailas') & (df['Brand'] != 'N') & (df['Brand'] != 'La Sportiva' )& (df['Brand'] != 'The' )]
-    # Clean and format data
+   
+   # Clean and format data
     df['Price'] = df['Price'].replace('[\$,]', '', regex=True).astype(float)
     # Create Rating Category
     df['Rating Category'] = pd.cut(
@@ -112,14 +113,15 @@ def load_data():
         bins=[0, 75, 90, 100],
         labels=['Low (<75)', 'Medium (75-90)', 'High (90+)']
     )
+    # Make Daily Running
+    df['Pace'] = df['Pace'].replace({'Daily running': 'Daily Running'})
     # Make Pace ordered
     df['Pace'] = pd.Categorical(
         df['Pace'],
-        categories=['Daily running', 'Tempo', 'Competition'],
+        categories=['Daily Running', 'Tempo', 'Competition'],
         ordered=True
     )
     return df
-
 df = load_data()
 running_data = df[df['Category'] == 'Running'].copy()
 
@@ -242,21 +244,31 @@ if not filtered.empty:
     # Product Name
     col1.markdown(
         f"<div style='background:linear-gradient(to right, #6a11cb, #2575fc); padding:10px; border-radius:5px; color:white; text-align:center;'>"
-        f"<h3>{shoe['Product Name']}</h3>"
+        f"<h3>{shoe['Brand']} { shoe['Product Name']}</h3>"
         f"</div>",
         unsafe_allow_html=True
     )
-
     # Price
-    col2.markdown(
+    price = shoe['Price']
+    average_price = running_data['Price'].mean()
+    price_difference = price - average_price
+
+    if price_difference > 0:
+        arrow = "⬆️"
+        diff_color = "red"
+    else:
+        arrow = "⬇️"
+        diff_color = "green"
+
+    col3.markdown(
         f"<div style='background:linear-gradient(to right, #ff7e5f, #feb47b); padding:10px; border-radius:5px; color:white; text-align:center;'>"
-        f"<h3>Price: ${shoe['Price']}</h3>"
+        f"<h3>Price: ${price:.2f} <span style='color:{diff_color};'>{arrow} $({price_difference:+.2f})</span></h3>"
         f"</div>",
         unsafe_allow_html=True
     )
 
     # Pace
-    col3.markdown(
+    col2.markdown(
         f"<div style='background:linear-gradient(to right, #43cea2, #185a9d); padding:10px; border-radius:5px; color:white; text-align:center;'>"
         f"<h3>{shoe['Pace']}</h3>"
         f"</div>",
@@ -499,8 +511,8 @@ with row1_col2:
     fig, ax = plt.subplots(figsize=(8, 5))
     
     # Create categorical colors and markers for Pace categories
-    pace_colors = {'Daily running': '#3498db', 'Tempo': '#e74c3c', 'Competition': '#2ecc71'}
-    pace_markers = {'Daily running': 'o', 'Tempo': 's', 'Competition': '^'}
+    pace_colors = {'Daily Running': '#3498db', 'Tempo': '#e74c3c', 'Competition': '#2ecc71'}
+    pace_markers = {'Daily Running': 'o', 'Tempo': 's', 'Competition': '^'}
     
     # Plot each pace category 
     for pace, group in full_plot_data.groupby('Pace'):
