@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+import plotly.express as px
+import plotly.graph_objects as go
 
 # Page configuration
 st.set_page_config(
@@ -104,8 +106,9 @@ st.markdown("""
 def load_data():
     df = pd.read_csv('FootwearData_cleaned.csv')
     df = df[(df['Brand'] != 'Jordan') & (df['Brand'] != 'Kailas') & (df['Brand'] != 'N') & (df['Brand'] != 'La Sportiva' )& (df['Brand'] != 'The' )]
-   
-   # Clean and format data
+    
+    
+    # Clean and format data
     df['Price'] = df['Price'].replace('[\$,]', '', regex=True).astype(float)
     # Create Rating Category
     df['Rating Category'] = pd.cut(
@@ -113,15 +116,21 @@ def load_data():
         bins=[0, 75, 90, 100],
         labels=['Low (<75)', 'Medium (75-90)', 'High (90+)']
     )
-    # Make Daily Running
-    df['Pace'] = df['Pace'].replace({'Daily running': 'Daily Running'})
+    # Rename Pace categories
+    df['Pace'] = df['Pace'].replace({
+        'Daily running': 'Everyday',
+        'Tempo': 'Fast',
+        'Competition': 'Race'
+    })
+    
     # Make Pace ordered
     df['Pace'] = pd.Categorical(
         df['Pace'],
-        categories=['Daily Running', 'Tempo', 'Competition'],
+        categories=['Everyday', 'Fast', 'Race'],
         ordered=True
     )
     return df
+
 df = load_data()
 running_data = df[df['Category'] == 'Running'].copy()
 
@@ -169,26 +178,28 @@ with st.sidebar:
     else:
         product_filter = ["ALL"] + sorted(running_data['Product Name'].dropna().unique())
     chosen_product = st.selectbox("Select Product", product_filter)
-    
     # Feature selection
-    selected_feature = st.selectbox("Select Metric for Analysis", sorted([
-        'Drop (mm)', 
-        'Flexibility / Stiffness (average) (N)', 
-        'Forefoot stack (mm)', 
-        'Heel stack (mm)', 
-        'Insole thickness (mm)', 
-        'Midsole width - forefoot (mm)', 
-        'Midsole width - heel (mm)', 
-        'Outsole hardness (HC)', 
-        'Outsole thickness (mm)', 
-        'Price', 
-        'Stiffness in cold (%)', 
-        'Stiffness in cold (N)', 
-        'Tongue padding (mm)', 
-        'Weight (g)', 
-        'Weight (oz)'
-    ]))
-    
+    selected_feature = st.selectbox(
+        "Select Metric for Analysis", 
+        sorted([
+            'Drop (mm)', 
+            'Flexibility / Stiffness (average) (N)', 
+            'Forefoot stack (mm)', 
+            'Heel stack (mm)', 
+            'Insole thickness (mm)', 
+            'Midsole width - forefoot (mm)', 
+            'Midsole width - heel (mm)', 
+            'Outsole hardness (HC)', 
+            'Outsole thickness (mm)', 
+            'Price', 
+            'Stiffness in cold (%)', 
+            'Stiffness in cold (N)', 
+            'Tongue padding (mm)', 
+            'Weight (g)', 
+            'Weight (oz)'
+        ]),
+        index=9 # Ensure 'Price' is selected by default
+    )
     # Key metrics summary
     st.subheader("Market Overview")
     total_products = running_data['Brand'].count()
@@ -220,7 +231,7 @@ st.markdown("<h1 style='text-align: center;'>Running Shoe Market Analysis Dashbo
 # Brief data story
 st.markdown("""
 <div class='header-style'>
-<b>The Story Behind the Data:</b> This dashboard explores the technical specifications, price points, and customer satisfaction 
+<b>The Story Behind the Data:</b> This dashboard explores the technical specifications, price points, and audience reviews from e-commerce and wear-testing reviews
 across different running shoe categories. Discover how features like stack height, weight, and flexibility 
 influence performance ratings and how brands position themselves across different running segments.
 </div>
@@ -244,31 +255,21 @@ if not filtered.empty:
     # Product Name
     col1.markdown(
         f"<div style='background:linear-gradient(to right, #6a11cb, #2575fc); padding:10px; border-radius:5px; color:white; text-align:center;'>"
-        f"<h3>{shoe['Brand']} { shoe['Product Name']}</h3>"
+        f"<h3>{shoe['Product Name']}</h3>"
         f"</div>",
         unsafe_allow_html=True
     )
+
     # Price
-    price = shoe['Price']
-    average_price = running_data['Price'].mean()
-    price_difference = price - average_price
-
-    if price_difference > 0:
-        arrow = "⬆️"
-        diff_color = "red"
-    else:
-        arrow = "⬇️"
-        diff_color = "green"
-
-    col3.markdown(
+    col2.markdown(
         f"<div style='background:linear-gradient(to right, #ff7e5f, #feb47b); padding:10px; border-radius:5px; color:white; text-align:center;'>"
-        f"<h3>Price: ${price:.2f} <span style='color:{diff_color};'>{arrow} $({price_difference:+.2f})</span></h3>"
+        f"<h3>Price: ${shoe['Price']}</h3>"
         f"</div>",
         unsafe_allow_html=True
     )
 
     # Pace
-    col2.markdown(
+    col3.markdown(
         f"<div style='background:linear-gradient(to right, #43cea2, #185a9d); padding:10px; border-radius:5px; color:white; text-align:center;'>"
         f"<h3>{shoe['Pace']}</h3>"
         f"</div>",
@@ -387,18 +388,18 @@ with row1_col1:
         <b>Insight:</b> This radar chart shows how {product_name} compares to the market average across 
         key technical specifications. The larger the blue area, the more the shoe exceeds average values 
         for these metrics. 
-        Note - These values are normailized to a scale of 0-1 for comparison purposes (original are in parentheses)
+
+        Note - These values are normalized to a scale of 0-1 for comparison purposes - Hover over the chart to see the original values for each feature.
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
         <div class='insight-box'>
-        <b>Insight:</b> Select a specific product from the sidebar to see how it compares to market averages
+        <b>Action :</b> Select a specific product from the sidebar to see how it compares to market averages
         across key technical specifications.
         </div>
         """, unsafe_allow_html=True)
     
-
     # Create radar chart
     scaler = MinMaxScaler()
     radar_features = [
@@ -447,274 +448,398 @@ with row1_col1:
         'Average Value': average_normalized_values[shoe_normalized.index].values
     })
     
-    # Create radar chart
-    categories = plot_df['Feature']
-    values = plot_df['Normalized Value'].values.tolist()
-    values += values[:1]  # Close the loop
+    # Prepare data for Plotly radar chart
+    categories = plot_df['Feature'].tolist()
+    values = plot_df['Normalized Value'].tolist()
+    values.append(values[0])  # Close the loop
     
-    average_values = plot_df['Average Value'].values.tolist()
-    average_values += average_values[:1]  # Close the loop
+    average_values = plot_df['Average Value'].tolist()
+    average_values.append(average_values[0])  # Close the loop
     
     category_values = {}
     for category, averages in rating_category_averages.items():
-        category_values[category] = averages[plot_df['Feature']].values.tolist()
-        category_values[category] += category_values[category][:1]  # Close the loop
+        category_values[category] = averages[plot_df['Feature']].tolist()
+        category_values[category].append(category_values[category][0])  # Close the loop
     
-    # Configure the plot
-    num_vars = len(categories)
-    angles = [n / float(num_vars) * 2 * np.pi for n in range(num_vars)]
-    angles += angles[:1]  # Close the loop
+    # Create Plotly radar chart
+    original_values = running_data.loc[shoe_index, valid_features]
     
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    # Create Plotly radar chart with modified hover template
+    fig = go.Figure()
     
-    # Plot selected product
-    ax.plot(angles, values, linewidth=2.5, linestyle='solid', label='Selected Product', color='#1f77b4')
-    ax.fill(angles, values, color='#1f77b4', alpha=0.25)
+    # Add selected product trace with both normalized and original values
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=categories + [categories[0]],
+        fill='toself',
+        name='Selected Product',
+        line=dict(color='#1f77b4'),
+        text=[f"{cat}: {orig:.2f}" for cat, orig in zip(categories, original_values)],  # Original values
+        hovertemplate=(
+            "<b>%{theta}</b><br>" +
+            "Normalized: %{r:.2f}<br>" +
+            "Ground Truth: %{text}<br>" +
+            "<extra></extra>"
+        )
+    ))
     
-    # Plot average
-    ax.plot(angles, average_values, linewidth=2, linestyle='dashed', label='Market Average', color='#ff7f0e')
+    # Add market average trace with original values
+    market_averages = running_data[valid_features].mean()
+    fig.add_trace(go.Scatterpolar(
+        r=average_values,
+        theta=categories + [categories[0]],
+        fill='toself',
+        name='Market Average',
+        line=dict(color='#ff7f0e', dash='dash'),
+        text=[f"{cat}: {avg:.2f}" for cat, avg in zip(categories, market_averages)],
+        hovertemplate=(
+            "<b>%{theta}</b><br>" +
+            "Normalized: %{r:.2f}<br>" +
+            "Original: %{text}<br>" +
+            "<extra></extra>"
+        )
+    ))
     
-    # Plot high rating category if available
+    # Add high rating category trace with original values if available
     for category, category_vals in category_values.items():
-        ax.plot(angles, category_vals, linestyle='dotted', linewidth=1.5, 
-                label=f'Top Rated Average', color='#2ca02c')
+        high_rated_averages = running_data[running_data['Rating Category'] == 'High (90+)'][valid_features].mean()
+        fig.add_trace(go.Scatterpolar(
+            r=category_vals,
+            theta=categories + [categories[0]],
+            fill='none',
+            name=f'Top Rated Average',
+            line=dict(color='#2ca02c', dash='dot'),
+            text=[f"{cat}: {avg:.2f}" for cat, avg in zip(categories, high_rated_averages)],
+            hovertemplate=(
+                "<b>%{theta}</b><br>" +
+                "Normalized: %{r:.2f}<br>" +
+                "Original: %{text}<br>" +
+                "<extra></extra>"
+            )
+        ))
+    # Update layout
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1],
+                tickfont=dict(size=10)
+            )
+        ),
+        showlegend=True,
+        legend=dict(
+            title="Legend",
+            orientation="h",
+            yanchor="bottom",
+            y=-0.2,
+            xanchor="center",
+            x=0.5
+        ),
+        margin=dict(l=20, r=20, t=20, b=20)
+    )
     
-    # Customize
-    ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-    ax.set_yticklabels(["0.2", "0.4", "0.6", "0.8", "1.0"], color="gray", size=8)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels([f.split(' (')[0] for f in categories], fontsize=9)
-    ax.grid(True, linestyle='--', alpha=0.7)
-            
-    # Add legend with better positioning
-    ax.legend(loc='lower right', bbox_to_anchor=(0.1, 0.1))
-    
-    plt.tight_layout()
-    st.pyplot(fig)
+    # Display the radar chart
+    st.plotly_chart(fig, use_container_width=True)
 
 # Plot 4: Enhanced Analysis (Price vs Rating Scatter)
+# First, add import at the top of the file:
+
+
+# Then replace the scatter plot section in row1_col2 with:
+
 with row1_col2:
-    st.markdown("### Price vs. Rating Relationship")
+
+    st.markdown(f"### {selected_feature} vs. Rating Relationship")
     
     # Add insights box
-    st.markdown("""
+    st.markdown(f"""
     <div class='insight-box'>
-    <b>Insight:</b> This visualization explores the relationship between price and customer satisfaction 
-    across different performance categories, helping to identify value leaders and premium performers.
+    <b>Insight:</b> This visualization explores the relationship between {selected_feature.lower()} and percieved audience rating, helping to identify optimal specifications.
+    <br>
+    <b>Action :</b>  Change the brand, selected product and features in the sidebar to see how the correlation changes and highlight the brand's positioning.
     </div>
     """, unsafe_allow_html=True)
     
-    # Use the full dataset for this plot, unaffected by brand selection
+    # Use the full dataset for this plot
     full_plot_data = running_data.copy()
     
-    # Create an enhanced scatter plot
-    fig, ax = plt.subplots(figsize=(8, 5))
+    # Create Plotly figure
+    fig = go.Figure()
     
-    # Create categorical colors and markers for Pace categories
-    pace_colors = {'Daily Running': '#3498db', 'Tempo': '#e74c3c', 'Competition': '#2ecc71'}
-    pace_markers = {'Daily Running': 'o', 'Tempo': 's', 'Competition': '^'}
+    # Color scheme
+    pace_colors = {'Everyday': '#3498db', 'Fast': '#e74c3c', 'Race': '#2ecc71'}
+    pace_symbols = {'Everyday': 'circle', 'Fast': 'square', 'Race': 'triangle-up'}
     
-    # Plot each pace category 
-    for pace, group in full_plot_data.groupby('Pace'):
-        ax.scatter(
-            group['Price'], 
-            group['Audience Rating'],
-            s=80,
-            alpha=0.7,
-            c=pace_colors[pace],
-            marker=pace_markers[pace],
-            label=pace,
-            edgecolors='white',
-            linewidths=0.5
-        )
+    # Add traces for each pace category
+    for pace in full_plot_data['Pace'].dropna().unique():
+        mask = full_plot_data['Pace'] == pace
+        group = full_plot_data[mask]
+        
+        # Add scatter plot
+        fig.add_trace(go.Scatter(
+            x=group[selected_feature],  # Use selected_feature instead of Price
+            y=group['Audience Rating'],
+            name=pace,
+            mode='markers',
+            marker=dict(
+                size=10,
+                symbol=pace_symbols[pace],
+                color=pace_colors[pace],
+                line=dict(width=1, color='white')
+            ),
+            text=group.apply(
+                lambda row: f"{row['Brand']} - {row['Product Name']}" +
+                            (f"<br>Release Date: {row['Release Date']}" if 'Release Date' in group.columns and pd.notna(row['Release Date']) else ""),
+                axis=1
+            ),
+            hovertemplate=(
+                "<b>%{text}</b><br>" +
+                f"{selected_feature}: " + "%{x:.2f}<br>" +
+                "Rating: %{y:.1f}<br>" +
+                "<extra></extra>"
+            )
+        ))
+        
+        # Add trend line with error handling
+        if len(group) > 1:
+            try:
+                valid_mask = ~np.isnan(group[selected_feature]) & ~np.isnan(group['Audience Rating'])
+                if sum(valid_mask) > 1:
+                    x = group[selected_feature][valid_mask]
+                    y = group['Audience Rating'][valid_mask]
+                    
+                    if np.ptp(x) > 0 and np.ptp(y) > 0:
+                        A = np.vstack([x, np.ones(len(x))]).T
+                        slope, intercept = np.linalg.lstsq(A, y, rcond=None)[0]
+                        
+                        x_range = np.linspace(x.min(), x.max(), 100)
+                        y_range = slope * x_range + intercept
+                        
+                        fig.add_trace(go.Scatter(
+                            x=x_range,
+                            y=y_range,
+                            mode='lines',
+                            line=dict(color=pace_colors[pace], dash='dash', width=1),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ))
+            except Exception as e:
+                st.warning(f"Could not compute trend line for {pace} category due to insufficient or invalid data.")
+                continue
     
-    # Add trend line for each category
-    for pace, group in full_plot_data.groupby('Pace'):
-        if len(group) > 1:  # Need at least 2 points for regression
-            x = group['Price']
-            y = group['Audience Rating']
-            z = np.polyfit(x, y, 1)
-            p = np.poly1d(z)
-            ax.plot(x, p(x), linestyle='--', color=pace_colors[pace], alpha=0.6)
+    # Highlight selected brand's products
+    if selected_brand != "ALL" and selected_brand in full_plot_data['Brand'].values:
+            brand_data = full_plot_data[full_plot_data['Brand'] == selected_brand]
+            
+            # Create a dictionary to map products to their pace symbols
+            product_pace_symbols = {}
+            for _, row in brand_data.iterrows():
+                if row['Pace'] in pace_symbols:
+                    product_pace_symbols[row['Product Name']] = pace_symbols[row['Pace']]
+                else:
+                    product_pace_symbols[row['Product Name']] = 'diamond'  # default symbol
+            
+            fig.add_trace(go.Scatter(
+                x=brand_data[selected_feature],
+                y=brand_data['Audience Rating'],
+                mode='markers',
+                marker=dict(
+                    size=12,
+                    symbol=[product_pace_symbols[name] for name in brand_data['Product Name']],  # Dynamic symbols
+                    color=pace_colors.get(selected_brand, '#FFD700'),
+                    line=dict(width=2, color='black')
+                ),
+                name=f"{selected_brand} Products",
+                text=brand_data.apply(
+                    lambda row: (
+                        f"{row['Product Name']}<br>"
+                        f"Brand: {row['Brand']}<br>"
+                        f"{selected_feature}: {row[selected_feature]:.2f}<br>"
+                        f"Performance: {row['Pace']}<br>"
+                        f"Release Date: {row['Release Date'] if 'Release Date' in brand_data.columns else 'N/A'}"
+                    ),
+                    axis=1
+                ),
+                hovertemplate=(
+                    "<b>%{text}</b><br>" +
+                    "Rating: %{y:.1f}<br>" +
+                    "<extra></extra>"
+                )
+            ))
+
+    # Add average lines
+    avg_feature = full_plot_data[selected_feature].mean()
+    avg_rating = full_plot_data['Audience Rating'].mean()
     
-    # If a specific product is selected, highlight it
+    fig.add_hline(y=avg_rating, line_dash="dot", line_color="black", opacity=0.6)
+    fig.add_vline(x=avg_feature, line_dash="dot", line_color="black", opacity=0.6)
+    
+    # Highlight selected product if any
     if chosen_product != "ALL" and chosen_product in full_plot_data['Product Name'].values:
         product_data = full_plot_data[full_plot_data['Product Name'] == chosen_product]
         if not product_data.empty:
-            ax.scatter(
-                product_data['Price'],
-                product_data['Audience Rating'],
-                s=150,
-                facecolors='none',
-                edgecolors='black',
-                linewidths=2,
-                zorder=10
-            )
-            # Add annotation
-            for _, row in product_data.iterrows():
-                ax.annotate(
-                    row['Product Name'],
-                    (row['Price'], row['Audience Rating']),
-                    xytext=(10, 5),
-                    textcoords='offset points',
-                    fontsize=9,
-                    weight='bold',
-                    bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8)
+            fig.add_trace(go.Scatter(
+                x=product_data[selected_feature],
+                y=product_data['Audience Rating'],
+                mode='markers',
+                marker=dict(
+                    size=19,
+                    symbol=pace_symbols.get(product_data.iloc[0]['Pace'], 'star'),  # Match the chosen_product's original pace icon
+                    color='cyan',
+                    line=dict(width=2, color='black')
+                ),
+                name=product_data.iloc[0]['Product Name'],  # Use the product name as the legend label
+                text=product_data.apply(
+                    lambda row: f"{row['Product Name']}<br>Brand: {row['Brand']}<br>{selected_feature}: {row[selected_feature]:.2f}<br>Performance: {row['Pace']}<br>Release Date: {row['Release Date'] if 'Release Date' in product_data.columns else 'N/A'}",
+                    axis=1
+                ),
+                hovertemplate=(
+                    "<b>%{text}</b><br>" +
+                    "Rating: %{y:.1f}<br>" +
+                    "<extra></extra>"
                 )
-    
-    # Add quadrant lines and labels
-    avg_price = full_plot_data['Price'].mean()
-    avg_rating = full_plot_data['Audience Rating'].mean()
-    
-    # Draw quadrant lines
-    ax.axhline(y=avg_rating, color='gray', linestyle=':', alpha=0.6)
-    ax.axvline(x=avg_price, color='gray', linestyle=':', alpha=0.6)
-    
-    # Add quadrant labels
-    ax.text(
-        full_plot_data['Price'].max() * 0.95, 
-        avg_rating + (full_plot_data['Audience Rating'].max() - avg_rating) * 0.75, 
-        "Premium Performers", 
-        fontsize=9, 
-        ha='right',
-        bbox=dict(boxstyle="round,pad=0.3", fc="#f0f2f6", ec="gray", alpha=0.8)
+            ))
+
+    # Update layout
+    fig.update_layout(
+        xaxis_title=dict(text=selected_feature, font=dict(size=16, weight='bold', color='black')),
+        yaxis_title=dict(text="Audience Rating", font=dict(size=16, weight='bold', color='black')),
+        showlegend=True,
+        legend_title=dict(text="Performance Category", font=dict(color='black')),
+        legend=dict(font=dict(color='black')),
+        hovermode='closest',
+        template='plotly_white',
+        margin=dict(l=20, r=20, t=20, b=20),
+        paper_bgcolor='white',
+        plot_bgcolor='white',
+        xaxis=dict(tickfont=dict(color='black')),
+        yaxis=dict(tickfont=dict(color='black'))
     )
-    ax.text(
-        avg_price - (avg_price - full_plot_data['Price'].min()) * 0.5, 
-        avg_rating + (full_plot_data['Audience Rating'].max() - avg_rating) * 0.75, 
-        "Value Leaders", 
-        fontsize=9,
-        bbox=dict(boxstyle="round,pad=0.3", fc="#f0f2f6", ec="gray", alpha=0.8)
-    )
-    
-    # Customize
-    ax.set_xlabel('Price ($)', fontweight='bold')
-    ax.set_ylabel('Audience Rating', fontweight='bold')
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.grid(True, linestyle='--', alpha=0.3)
-    
-    # Add legend
-    ax.legend(title="Performance Category", loc='lower right')
     
     # Add correlation coefficient
-    corr = full_plot_data['Price'].corr(full_plot_data['Audience Rating'])
-    ax.text(
-        0.05, 0.05, 
-        f"Correlation: {corr:.2f}", 
-        transform=ax.transAxes, 
-        fontsize=9,
-        bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8)
+    corr = full_plot_data[selected_feature].corr(full_plot_data['Audience Rating'])
+    fig.add_annotation(
+        x=0.05,
+        y=0.05,
+        xref="paper",
+        yref="paper",
+        text=f"Correlation: {corr:.2f}",
+        showarrow=False,
+        bgcolor="white",
+        bordercolor="gray",
+        borderwidth=1,
+        font=dict(size=12, color="black")
     )
     
-    plt.tight_layout()
-    st.pyplot(fig)
-
-
+    # Display the plot
+    st.plotly_chart(fig, use_container_width=True)
 # Plot 1: Feature Distribution by Pace and Rating
-# Replace the plotting section in row2_col1 with:
-
+# Add debug prints to check data at each step
 with row2_col1:
+    st.markdown(f"### {selected_feature} Distribution by Performance Category")
     if selected_feature in plot_data.columns:
-        # Debug prints to understand data distribution
-        st.markdown(f"### {selected_feature} Distribution by Performance Category")
-        
         # Add insights box
         st.markdown(f"""
         <div class='insight-box'>
         <b>Insight:</b> This visualization reveals how {selected_feature.lower()} varies across different 
-        performance categories and rating classes. Identifying these patterns can help determine optimal 
-        specifications for each shoe type.
+        performance categories and rating classes. The box represents 75% of the data, while the line inside represents the median - hover over the boxes to get a deeper insight . 
+        
+  
+        <b>Action :</b> Change the brand and selected feature in the sidebar to see how the distribution changes.
         </div>
         """, unsafe_allow_html=True)
         
-        # Create the plot with modified grouping
-        fig, ax = plt.subplots(figsize=(6, 4))
+        # Prepare data for Plotly boxplot
+        filtered_data = plot_data.dropna(subset=[selected_feature, 'Pace', 'Rating Category'])
         
-        # Define categories explicitly to ensure consistent order
-        rating_categories = ['Low (<75)', 'Medium (75-90)', 'High (90+)']
-        pace_categories = ['Daily Running', 'Tempo', 'Competition']
-        colors = ['#FF5A5F', '#FFC107', '#4CAF50']
+        # Create Plotly boxplot with custom hover template
+        fig = px.box(
+            filtered_data,
+            x='Pace',
+            y=selected_feature,
+            color='Rating Category',
+            category_orders={
+                'Pace': ['Everyday', 'Fast', 'Race'],  # Ensure correct x-axis order
+                'Rating Category': ['Low (<75)', 'Medium (75-90)', 'High (90+)']
+            },
+            color_discrete_map={
+                'Low (<75)': '#FF5A5F',
+                'Medium (75-90)': '#FFC107',
+                'High (90+)': '#4CAF50'
+            },
+            points='outliers',  # Show only outlier points
+            title=f"{selected_feature} Distribution by Pace and Rating Category",
+            labels={
+                'Pace': 'Performance Category',
+                selected_feature: selected_feature,
+                'Rating Category': 'Rating Class'
+            },
+            hover_data=['Brand', 'Product Name'],  # Add these fields to hover info
+            custom_data=['Brand', 'Product Name']  # Include in custom data for hover template
+        )
+
+        # Update hover template for outlier points
+        fig.update_traces(
+            hovertemplate=(
+                "<b>%{customdata[1]}</b><br>" +  # Product Name
+                "Brand: %{customdata[0]}<br>" +   # Brand
+                f"{selected_feature}: %{{y:.2f}}<br>" +  # Selected feature value
+                "Performance: %{x}<br>" +         # Pace category
+                "<extra></extra>"
+            )
+        )
+        # Update layout
+        fig.update_layout(
+            boxmode='group',
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            xaxis_title=dict(
+            text="<b>Performance Category</b>",  # Make x-axis title bold
+            font=dict(color='black', size=16)
+            ),
+            yaxis_title=dict(
+            text=f"<b>{selected_feature}</b>",  # Make y-axis title bold
+            font=dict(color='black', size=16)
+            ),
+            legend_title=dict(
+            text="<b>Audience Rating</b>",  # Make legend title bold
+            font=dict(color='black')
+            ),
+            legend=dict(
+            font=dict(color='black')  # Ensure legend values are black
+            ),
+            template='plotly_white',
+            margin=dict(l=20, r=20, t=40, b=20),
+            xaxis=dict(
+            showgrid=True,
+            gridcolor='black',
+            zeroline=False,
+            linecolor='black',
+            tickfont=dict(color='black', size=14),
+            categoryorder='array',
+            categoryarray=['Everyday', 'Fast', 'Race']
+            ),
+            yaxis=dict(
+            showgrid=True,
+            gridcolor='black',
+            zeroline=False,
+            linecolor='black',
+            tickfont=dict(color='black', size=14)
+            )
+        )
         
-        # Modified grouping approach
-        grouped_data = []
-        for pace in pace_categories:
-            for rating in rating_categories:
-                data = plot_data[
-                    (plot_data['Pace'] == pace) & 
-                    (plot_data['Rating Category'] == rating)
-                ][selected_feature].dropna().tolist()
-                
-                if len(data) > 0:  # Only add if we have data
-                    grouped_data.append({
-                        'Pace': pace,
-                        'Rating': rating,
-                        'Data': data
-                    })
-        
-        # Plot each category
-        positions = []
-        for i, rating in enumerate(rating_categories):
-            for j, pace in enumerate(pace_categories):
-                current_data = [g['Data'] for g in grouped_data 
-                              if g['Pace'] == pace and g['Rating'] == rating]
-                
-                if current_data and len(current_data[0]) > 0:
-                    pos = j + i * 0.25  # Increased spacing between categories
-                    positions.append(pos)
-                    
-                    # Create boxplot
-                    bplot = ax.boxplot(
-                        current_data,
-                        positions=[pos],
-                        widths=0.15,
-                        patch_artist=True,
-                        boxprops=dict(facecolor=colors[i], color='black', alpha=0.7),
-                        whiskerprops=dict(color='black'),
-                        capprops=dict(color='black'),
-                        medianprops=dict(color='white', linewidth=1.5),
-                        flierprops=dict(marker='o', markerfacecolor=colors[i], markersize=4)
-                    )
-        
-        # Add color indicators above plot
-        col1, col2, col3 = st.columns(3)
-        for col, color, label in zip([col1, col2, col3], colors, rating_categories):
-            with col:
-                st.markdown(
-                f"<div style='background:{color}; padding:8px; border-radius:5px; color:white; text-align:center;'>"
-                f"<b>{label}</b>"
-                f"</div>",
-                unsafe_allow_html=True
+        # Update traces to add black outlines to the boxes
+        fig.update_traces(
+            marker=dict(
+                line=dict(
+                    color='black',
+                    width=1
                 )
+            )
+        )
         
-        # Customize plot
-        ax.set_xticks([i + 0.25 for i in range(len(pace_categories))])
-        ax.set_xticklabels(pace_categories, rotation=45)
-        ax.set_xlabel("Performance Category", fontweight='bold')
-        ax.set_ylabel(selected_feature, fontweight='bold')
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        
-        # Add data counts as text
-        for pace in pace_categories:
-            for i, rating in enumerate(rating_categories):
-                count = len(plot_data[
-                    (plot_data['Pace'] == pace) & 
-                    (plot_data['Rating Category'] == rating)
-                ])
-                if count > 0:
-                    ax.text(
-                        pace_categories.index(pace) + i * 0.25,
-                        ax.get_ylim()[0],
-                        f'n={count}',
-                        horizontalalignment='center',
-                        verticalalignment='top',
-                        fontsize=8
-                    )
-        
-        plt.tight_layout()
-        st.pyplot(fig)
+        # Display the plot
+        st.plotly_chart(fig, use_container_width=True)
 
 # Plot 2: Brand Performance Table
 with row2_col2:
@@ -726,6 +851,8 @@ with row2_col2:
     <b>Insight:</b> This table highlights how different brands perform across pace categories, showing the 
     correlation between price point, audience satisfaction, and market presence. Brands targeting specific 
     niches often show distinct performance patterns.
+    
+    Action : Select a brand in the sidebar and see how they perform across various categories.
     </div>
     """, unsafe_allow_html=True)
     
@@ -780,127 +907,9 @@ with row2_col2:
         height=400
     )
 
-# Plot 5: Enhanced Analysis (Price vs Selected Feature Scatter)
-# with row1_col2:
-#     st.markdown(f"### {selected_feature} vs. Audience Rating Relationship")
-    
-#     # Add insights box
-#     st.markdown(f"""
-#     <div class='insight-box'>
-#     <b>Insight:</b> This visualization explores the relationship between {selected_feature.lower()} and audience rating 
-#     across different performance categories, helping to identify trends and outliers.
-#     </div>
-#     """, unsafe_allow_html=True)
-    
-#     # Create an enhanced scatter plot
-#     fig, ax = plt.subplots(figsize=(8, 5))
-    
-#     # Create categorical colors and markers for Pace categories
-#     pace_colors = {'Daily running': '#3498db', 'Tempo': '#e74c3c', 'Competition': '#2ecc71'}
-#     pace_markers = {'Daily running': 'o', 'Tempo': 's', 'Competition': '^'}
-    
-#     # Plot each pace category 
-#     for pace, group in plot_data.groupby('Pace'):
-#         ax.scatter(
-#             group[selected_feature], 
-#             group['Audience Rating'],
-#             s=80,
-#             alpha=0.7,
-#             c=pace_colors[pace],
-#             marker=pace_markers[pace],
-#             label=pace,
-#             edgecolors='white',
-#             linewidths=0.5
-#         )
-    
-#     # Add trend line for each category
-#     for pace, group in plot_data.groupby('Pace'):
-#         if len(group) > 1 and np.ptp(group[selected_feature]) > 0 and np.ptp(group['Audience Rating']) > 0:  # Ensure sufficient variance
-#             x = group[selected_feature]
-#             y = group['Audience Rating']
-#             try:
-#                 z = np.polyfit(x, y, 1)
-#                 p = np.poly1d(z)
-#                 ax.plot(x, p(x), linestyle='--', color=pace_colors[pace], alpha=0.6)
-#             except np.linalg.LinAlgError:
-#                 st.warning(f"Could not compute regression for {pace} due to numerical instability.")
-    
-#     # If a specific product is selected, highlight it
-#     if chosen_product != "ALL" and chosen_product in plot_data['Product Name'].values:
-#         product_data = plot_data[plot_data['Product Name'] == chosen_product]
-#         if not product_data.empty:
-#             ax.scatter(
-#                 product_data[selected_feature],
-#                 product_data['Audience Rating'],
-#                 s=150,
-#                 facecolors='none',
-#                 edgecolors='black',
-#                 linewidths=2,
-#                 zorder=10
-#             )
-#             # Add annotation
-#             for _, row in product_data.iterrows():
-#                 ax.annotate(
-#                     row['Product Name'],
-#                     (row[selected_feature], row['Audience Rating']),
-#                     xytext=(10, 5),
-#                     textcoords='offset points',
-#                     fontsize=9,
-#                     weight='bold',
-#                     bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8)
-#                 )
-    
-#     # Add quadrant lines and labels
-#     avg_feature = plot_data[selected_feature].mean()
-#     avg_rating = plot_data['Audience Rating'].mean()
-    
-#     # Draw quadrant lines
-#     ax.axhline(y=avg_rating, color='gray', linestyle=':', alpha=0.6)
-#     ax.axvline(x=avg_feature, color='gray', linestyle=':', alpha=0.6)
-    
-#     # Add quadrant labels
-#     ax.text(
-#         avg_feature + (plot_data[selected_feature].max() - avg_feature) * 0.75, 
-#         plot_data['Audience Rating'].max() * 0.95, 
-#         "High Performers", 
-#         fontsize=9, 
-#         ha='right',
-#         bbox=dict(boxstyle="round,pad=0.3", fc="#f0f2f6", ec="gray", alpha=0.8)
-#     )
-#     ax.text(
-#         avg_feature + (plot_data[selected_feature].max() - avg_feature) * 0.75, 
-#         avg_rating - (avg_rating - plot_data['Audience Rating'].min()) * 0.5, 
-#         "Improvement Needed", 
-#         fontsize=9,
-#         bbox=dict(boxstyle="round,pad=0.3", fc="#f0f2f6", ec="gray", alpha=0.8)
-#     )
-    
-#     # Customize
-#     ax.set_xlabel(selected_feature, fontweight='bold')
-#     ax.set_ylabel('Audience Rating', fontweight='bold')
-#     ax.spines['top'].set_visible(False)
-#     ax.spines['right'].set_visible(False)
-#     ax.grid(True, linestyle='--', alpha=0.3)
-    
-#     # Add legend
-#     ax.legend(title="Performance Category", loc='lower right')
-    
-#     # Add correlation coefficient
-#     corr = plot_data[selected_feature].corr(plot_data['Audience Rating'])
-#     ax.text(
-#         0.05, 0.05, 
-#         f"Correlation: {corr:.2f}", 
-#         transform=ax.transAxes, 
-#         fontsize=9,
-#         bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8)
-#     )
-    
-#     plt.tight_layout()
-#     st.pyplot(fig)
 # Footer with methodology note
 st.markdown("""
 ---
 **Methodology Note:** This analysis is based on technical measurements and audience ratings 
-collected from running footwear testing. All measurements follow industry standards for 
-consistency and comparability.
+collected from RunRepeat.com. 
 """)
