@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors
 import seaborn as sns
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
@@ -13,8 +14,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Replace the current custom styling section with:
 
 # Custom styling
 st.markdown("""
@@ -542,11 +541,6 @@ with row1_col1:
     st.plotly_chart(fig, use_container_width=True)
 
 # Plot 4: Enhanced Analysis (Price vs Rating Scatter)
-# First, add import at the top of the file:
-
-
-# Then replace the scatter plot section in row1_col2 with:
-
 with row1_col2:
 
     st.markdown(f"### {selected_feature} vs. Rating Relationship")
@@ -906,6 +900,142 @@ with row2_col2:
         use_container_width=True,
         height=400
     )
+
+# New Time Series Analysis Plot
+st.markdown("<h1 style='text-align: left;'>Feature Changes Over Time - Use Sidebar to Select Different Features and Track Their Changes</h2>", unsafe_allow_html=True)
+
+
+# Create a new row for the time series plot
+row3_col1, row3_col2 = st.columns([3, 1])
+with row3_col1:
+    st.markdown(f"### {selected_feature} Trends Over Time by Performance Category")
+    
+    # Add insights box
+    st.markdown(f"""
+    <div class='insight-box'>
+    <b>Insight:</b> This visualization shows how {selected_feature.lower()} has evolved over time
+    for different performance categories, highlighting how specifications vary across different use cases.
+    Data points represent yearly averages within each category.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    try:
+        # Convert 'Original Review Date' to datetime and extract year
+        running_data['Year'] = pd.to_datetime(running_data['Original Review Date'], format='%b %d, %Y').dt.year
+        running_data = running_data[running_data['Year'] >= 2021]
+        # Create figure
+        fig = go.Figure()
+        
+        # Color scheme for pace categories
+        pace_colors = {
+            'Everyday': '#3498db',
+            'Fast': '#e74c3c',
+            'Race': '#2ecc71'
+        }
+        
+        # Process each pace category
+        for pace in ['Everyday', 'Fast', 'Race']:
+            # Filter data for this pace
+            pace_data = running_data[running_data['Pace'] == pace]
+            
+            # Calculate yearly averages for the selected feature
+            yearly_data = pace_data.groupby('Year')[selected_feature].agg(['mean', 'count', 'std']).reset_index()
+            yearly_data = yearly_data[yearly_data['count'] > 0]  # Remove years with no data
+            
+            # Add main line
+            fig.add_trace(go.Scatter(
+                x=yearly_data['Year'],
+                y=yearly_data['mean'],
+                mode='lines+markers',
+                name=pace,
+                line=dict(color=pace_colors[pace], width=2),
+                marker=dict(size=8),
+                hovertemplate=(
+                    f"<b>{pace}</b><br>" +
+                    "Year: %{x}<br>" +
+                    f"{selected_feature}: %{{y:.2f}}<br>" +
+                    "Sample size: %{customdata[0]}<br>" +
+                    "Std: %{customdata[1]:.2f}<br>" +
+                    "<extra></extra>"
+                ),
+                customdata=yearly_data[['count', 'std']]
+            ))
+            
+          
+        
+        # Update layout
+        fig.update_layout(
+            xaxis_title=dict(text="Year", font=dict(size=14)),
+            yaxis_title=dict(text=selected_feature, font=dict(size=18)),
+            template='plotly_white',
+            hovermode='x unified',
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            margin=dict(l=20, r=20, t=40, b=20),
+            xaxis=dict(
+                showgrid=True,
+                gridcolor='lightgray',
+                dtick=1,  # Show every year
+                tickangle=45
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridcolor='lightgray',
+                zeroline=False
+            )
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+    except Exception as e:
+        st.warning("Unable to process time series data. Please check if the date format is consistent.")
+        st.error(f"Error details: {str(e)}")
+
+with row3_col2:
+    # Add summary statistics
+    if 'Year' in running_data.columns:
+        st.markdown("### Quick Stats")
+
+        # Calculate latest year stats by pace category
+        latest_year = running_data['Year'].max()
+        earliest_year = running_data['Year'].min()
+        total_years = latest_year - earliest_year
+
+        # Show data range
+        st.markdown(f"""
+        <div class='metric-container' style='background-color: #1e3d59; color: white;'>
+            <div class='metric-label' style='color: white;'>Year Range</div>
+            <div class='metric-value' style='color: white;'>{earliest_year} - {latest_year}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Calculate and show changes for each pace category
+        for pace in ['Everyday', 'Fast', 'Race']:
+            pace_data = running_data[running_data['Pace'] == pace]
+            yearly_avgs = pace_data.groupby('Year')[selected_feature].mean()
+            
+            if not yearly_avgs.empty:
+                latest_avg = yearly_avgs.get(latest_year, 0)
+                earliest_avg = yearly_avgs.get(earliest_year, 0)
+                
+                if earliest_avg != 0:
+                    pct_change = ((latest_avg - earliest_avg) / earliest_avg) * 100
+                    
+                    background_color = pace_colors[pace]
+                    text_color = '#FFFFFF'  # White text for better contrast
+                    st.markdown(f"""
+                    <div class='metric-container' style='background-color: {background_color}; color: {text_color};'>
+                        <div class='metric-label' style='color: {text_color};'>{pace} Change</div>
+                        <div class='metric-value' style='color: {text_color};'>{pct_change:.1f}%</div>
+                        <div class='metric-label' style='color: {text_color};'>({latest_avg:.1f} from {earliest_avg:.1f})</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 # Footer with methodology note
 st.markdown("""
