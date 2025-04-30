@@ -188,6 +188,7 @@ with st.sidebar:
             'Insole thickness (mm)', 
             'Midsole width - forefoot (mm)', 
             'Midsole width - heel (mm)', 
+            'Midsole softness (HA)',
             'Outsole hardness (HC)', 
             'Outsole thickness (mm)', 
             'Price', 
