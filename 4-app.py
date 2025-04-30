@@ -210,13 +210,7 @@ with st.sidebar:
     col1.metric("Number of Products", f"{total_products:.0f}")
     col2.metric("Avg. Rating", f"{avg_rating:.1f}")
     
-    # Download option
-    st.download_button(
-        "Download Data",
-        data=running_data.to_csv().encode(),
-        file_name="running_research_data.csv",
-        mime="text/csv"
-    )
+
 
 # Filter data based on selections
 if selected_brand != "ALL":
