@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors
-import seaborn as sns
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import plotly.express as px
@@ -169,6 +168,24 @@ with st.sidebar:
 
     # Filter options
     st.subheader("Analysis Filters")
+            # Extract the year from the 'Original Review Date' column
+    # Extract the year from the 'Original Review Date' column
+    running_data['Year'] = pd.to_datetime(running_data['Original Review Date'], format='%b %d, %Y').dt.year
+
+    # Create a separate copy of the data for time series analysis
+    time_series_data = running_data.copy()
+
+    # Add a year filter to the sidebar
+    with st.sidebar:
+        
+        available_years = sorted(running_data['Year'].dropna().unique(), reverse=True)  # Get unique years in descending order
+        available_years = [year for year in available_years if year >= 2021]  # Remove years before 2021
+        selected_year = st.selectbox("Select Year", ["ALL"] + [str(year) for year in available_years])
+
+    # Filter the data based on the selected year
+    if selected_year != "ALL":
+        running_data = running_data[running_data['Year'] == int(selected_year)]
+    
     selected_brand = st.selectbox("Select Brand", ["ALL"] + sorted(running_data['Brand'].unique()))
     
     # Dynamic product filter based on brand selection
@@ -200,7 +217,8 @@ with st.sidebar:
         ]),
         index=9 # Ensure 'Price' is selected by default
     )
-    # Key metrics summary
+
+# Key metrics summary
     st.subheader("Market Overview")
     total_products = running_data['Brand'].count()
     avg_rating = running_data['Audience Rating'].mean()
@@ -360,7 +378,9 @@ if not filtered.empty:
 
 row2_col1, row2_col2 = st.columns([5, 5])
 
-
+    # Color scheme
+pace_colors = {'Everyday': '#3498db', 'Fast': '#e74c3c', 'Race': '#2ecc71'}
+pace_symbols = {'Everyday': 'circle', 'Fast': 'square', 'Race': 'triangle-up'}
 
 # Plot 3: Radar Chart (Product Comparison)
 with row1_col1:
@@ -460,7 +480,14 @@ with row1_col1:
     
     # Create Plotly radar chart with modified hover template
     fig = go.Figure()
-    
+
+
+    # Format the original values, adding a dollar sign for Price
+    text_values = [
+        f"{cat}: ${orig:.2f}" if cat == "Price " else f"{cat}: {orig:.2f}"
+        for cat, orig in zip(categories, original_values)
+    ]
+
     # Add selected product trace with both normalized and original values
     fig.add_trace(go.Scatterpolar(
         r=values,
@@ -468,7 +495,7 @@ with row1_col1:
         fill='toself',
         name='Selected Product',
         line=dict(color='#1f77b4'),
-        text=[f"{cat}: {orig:.2f}" for cat, orig in zip(categories, original_values)],  # Original values
+        text=text_values,  # Pass the formatted text values
         hovertemplate=(
             "<b>%{theta}</b><br>" +
             "Normalized: %{r:.2f}<br>" +
@@ -477,40 +504,26 @@ with row1_col1:
         )
     ))
     
-    # Add market average trace with original values
-    market_averages = running_data[valid_features].mean()
-    fig.add_trace(go.Scatterpolar(
-        r=average_values,
-        theta=categories + [categories[0]],
-        fill='toself',
-        name='Market Average',
-        line=dict(color='#ff7f0e', dash='dash'),
-        text=[f"{cat}: {avg:.2f}" for cat, avg in zip(categories, market_averages)],
-        hovertemplate=(
-            "<b>%{theta}</b><br>" +
-            "Normalized: %{r:.2f}<br>" +
-            "Original: %{text}<br>" +
-            "<extra></extra>"
-        )
-    ))
-    
-    # Add high rating category trace with original values if available
-    for category, category_vals in category_values.items():
-        high_rated_averages = running_data[running_data['Rating Category'] == 'High (90+)'][valid_features].mean()
-        fig.add_trace(go.Scatterpolar(
-            r=category_vals,
-            theta=categories + [categories[0]],
-            fill='none',
-            name=f'Top Rated Average',
-            line=dict(color='#2ca02c', dash='dot'),
-            text=[f"{cat}: {avg:.2f}" for cat, avg in zip(categories, high_rated_averages)],
-            hovertemplate=(
-                "<b>%{theta}</b><br>" +
-                "Normalized: %{r:.2f}<br>" +
-                "Original: %{text}<br>" +
-                "<extra></extra>"
-            )
-        ))
+    # Add pace category averages
+    for pace in ['Everyday', 'Fast', 'Race']:
+        pace_data = running_data[running_data['Pace'] == pace]
+        if not pace_data.empty:
+            pace_averages = pace_data[valid_features].mean()
+            normalized_pace_averages = scaler.transform([pace_averages])[0]
+            fig.add_trace(go.Scatterpolar(
+                r=list(normalized_pace_averages) + [normalized_pace_averages[0]],
+                theta=categories + [categories[0]],
+                fill='none',
+                name=f'{pace} Average',
+                line=dict(color=pace_colors[pace], dash='dot'),
+                text=[f"{cat}: {avg:.2f}" for cat, avg in zip(categories, pace_averages)],
+                hovertemplate=(
+                    "<b>%{theta}</b><br>" +
+                    "Normalized: %{r:.2f}<br>" +
+                    "Original: %{text}<br>" +
+                    "<extra></extra>"
+                )
+            ))
     # Update layout
     fig.update_layout(
         polar=dict(
@@ -555,9 +568,7 @@ with row1_col2:
     # Create Plotly figure
     fig = go.Figure()
     
-    # Color scheme
-    pace_colors = {'Everyday': '#3498db', 'Fast': '#e74c3c', 'Race': '#2ecc71'}
-    pace_symbols = {'Everyday': 'circle', 'Fast': 'square', 'Race': 'triangle-up'}
+
     
     # Add traces for each pace category
     for pace in full_plot_data['Pace'].dropna().unique():
@@ -691,8 +702,8 @@ with row1_col2:
 
     # Update layout
     fig.update_layout(
-        xaxis_title=dict(text=selected_feature, font=dict(size=16, weight='bold', color='black')),
-        yaxis_title=dict(text="Audience Rating", font=dict(size=16, weight='bold', color='black')),
+        xaxis_title=dict(text=selected_feature, font=dict(size=16, color='black')),
+        yaxis_title=dict(text="Audience Rating", font=dict(size=16, color='black')),
         showlegend=True,
         legend_title=dict(text="Performance Category", font=dict(color='black')),
         legend=dict(font=dict(color='black')),
@@ -915,9 +926,9 @@ with row3_col1:
     """, unsafe_allow_html=True)
     
     try:
-        # Convert 'Original Review Date' to datetime and extract year
-        running_data['Year'] = pd.to_datetime(running_data['Original Review Date'], format='%b %d, %Y').dt.year
-        running_data = running_data[running_data['Year'] >= 2021]
+        time_series_data['Year'] = pd.to_datetime(time_series_data['Original Review Date'], format='%b %d, %Y').dt.year
+        running_data = time_series_data[time_series_data['Year'] >= 2021]
+        
         # Create figure
         fig = go.Figure()
         
@@ -1032,6 +1043,8 @@ with row3_col2:
                     </div>
                     """, unsafe_allow_html=True)
 
+
+row4_col1, row4_col2 = st.columns([3, 1])
 # Footer with methodology note
 st.markdown("""
 ---
