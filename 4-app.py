@@ -1045,6 +1045,269 @@ with row3_col2:
 
 
 row4_col1, row4_col2 = st.columns([3, 1])
+
+with row4_col1:
+    st.markdown("### Product Technical Profile")
+
+    # Filter for selected product
+    filtered = running_data.copy()
+    if selected_brand != "ALL":
+        filtered = filtered[filtered['Brand'] == selected_brand]
+    if chosen_product != "ALL":
+        filtered = filtered[filtered['Product Name'] == chosen_product]
+
+    # Add insights box if a product is selected
+    if chosen_product != "ALL":
+        product_name = filtered.iloc[0]['Product Name'] if not filtered.empty else chosen_product
+        st.markdown(f"""
+        <div class='insight-box'>
+        <b>Insight:</b> This radar chart shows how {product_name} compares to the market average across 
+        key technical specifications. The larger the blue area, the more the shoe exceeds average values 
+        for these metrics. 
+
+        Note - These values are normalized to a scale of 0-1 for comparison purposes - Hover over the chart to see the original values for each feature.
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class='insight-box'>
+        <b>Action :</b> Select a specific product from the sidebar to see how it compares to market averages
+        across key technical specifications.
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Create radar chart
+    scaler = MinMaxScaler()
+    radar_features = [
+        'Price', 
+        'Drop (mm)', 
+        'Forefoot stack (mm)', 
+        'Heel stack (mm)', 
+        'Insole thickness (mm)', 
+        'Midsole width - forefoot (mm)', 
+        'Midsole width - heel (mm)', 
+        'Outsole thickness (mm)', 
+        'Toebox width - widest part (average) (mm)', 
+        'Tongue padding (mm)', 
+        'Weight (g)'
+    ]
+
+    # Filter features that exist in the dataset
+    valid_features = [f for f in radar_features if f in running_data.columns]
+
+    normalized_data = running_data[valid_features].copy()
+    normalized_data = pd.DataFrame(
+        scaler.fit_transform(normalized_data),
+        columns=normalized_data.columns,
+        index=running_data.index
+    )
+
+    # User Input Form
+    with st.expander("Input Your Own Product Features"):
+        st.markdown("### Enter the values for your custom product:")
+        user_input = {}
+        for feature in valid_features:
+            user_input[feature] = st.number_input(
+                f"{feature} (e.g., {running_data[feature].mean():.2f})",
+                min_value=float(running_data[feature].min()),
+                max_value=float(running_data[feature].max()),
+                value=float(running_data[feature].mean())
+            )
+
+        # Submit button with custom style
+        custom_button = st.markdown("""
+            <style>
+            div.stButton > button {
+            background-color: white !important;
+            color: black !important;
+            border: 1px solid #ccc !important;
+            border-radius: 5px !important;
+            font-weight: bold !important;
+            }
+            div.stButton > button:hover {
+            background-color: #f0f0f0 !important;
+            color: black !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        if st.button("Add Custom Product"):
+            # Normalize user input
+            user_input_normalized = scaler.transform(pd.DataFrame([user_input]))
+            user_normalized_values = user_input_normalized[0]
+
+            # Add custom product to radar chart
+            custom_product_name = "Custom Product"
+            st.session_state['custom_product'] = {
+            'name': custom_product_name,
+            'values': user_normalized_values
+            }
+
+    # Prepare data for Plotly radar chart
+    shoe_index = shoe.name if chosen_product != "ALL" else None
+    shoe_normalized = normalized_data.loc[shoe_index].dropna() if shoe_index else None
+
+    # Calculate averages for comparison
+    normalized_data_without_selected = normalized_data.drop(index=shoe_index) if shoe_index else normalized_data
+    average_normalized_values = normalized_data_without_selected.mean()
+
+    # Create dataframe for plotting
+    plot_df = pd.DataFrame({
+        'Feature': shoe_normalized.index if shoe_index else valid_features,
+        'Normalized Value': shoe_normalized.values if shoe_index else [0] * len(valid_features),
+        'Average Value': average_normalized_values[valid_features].values
+    })
+
+# Prepare data for Plotly radar chart
+categories = plot_df['Feature'].tolist()
+values = plot_df['Normalized Value'].tolist()
+values.append(values[0])  # Close the loop
+
+# Create Plotly radar chart
+fig = go.Figure()
+
+# Add selected product trace
+if shoe_index:
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=categories,
+        fill='toself',
+        name='Selected Product',
+        line=dict(color='#1f77b4')
+    ))
+
+# Add average traces for the highest-rated products in each pace category
+for pace in ['Everyday', 'Fast', 'Race']:
+    pace_data = running_data[(running_data['Pace'] == pace) & (running_data['Audience Rating'] > 87.5)]
+    if not pace_data.empty:
+        # Calculate the average of the highest-rated products
+        pace_averages = pace_data[valid_features].mean()
+        normalized_pace_averages = scaler.transform([pace_averages])[0]
+        pace_values = list(normalized_pace_averages) + [normalized_pace_averages[0]]  # Close the loop
+
+        # Prepare hover text for original values
+        hover_text = [f"{cat}: {avg:.2f}" for cat, avg in zip(categories, pace_averages)]
+
+        # Add trace for the pace category
+        fig.add_trace(go.Scatterpolar(
+            r=pace_values,
+            theta=categories + [categories[0]],  # Close the loop
+            fill='none',
+            name=f'{pace} (Highest Rated Avg)',
+            line=dict(color=pace_colors[pace], dash='dot'),
+            text=hover_text + [hover_text[0]],  # Close the loop for hover text
+            hovertemplate=(
+                "<b>%{theta}</b><br>" +
+                "Normalized: %{r:.2f}<br>" +
+                "Original: %{text}<br>" +
+                "<extra></extra>"
+            )
+        ))
+
+# Add custom product trace if available
+# Add custom product trace if available
+if 'custom_product' in st.session_state:
+    custom_product = st.session_state['custom_product']
+    custom_values = list(custom_product['values']) + [custom_product['values'][0]]  # Close the loop
+
+    # Prepare hover text for custom product
+    custom_hover_text = [
+        f"{cat}: {orig:.2f}" for cat, orig in zip(categories, custom_product['values'])
+    ] + [f"{categories[0]}: {custom_product['values'][0]:.2f}"]  # Close the loop for hover text
+
+    # Add trace for the custom product
+    fig.add_trace(go.Scatterpolar(
+        r=custom_values,
+        theta=categories + [categories[0]],  # Close the loop
+        name=custom_product['name'],
+        line=dict(color='orange'),
+        text=custom_hover_text,  # Pass the hover text
+        hovertemplate=(
+            "<b>%{theta}</b><br>" +
+            "Normalized: %{r:.2f}<br>" +
+            "Original: %{text}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+# Update layout
+fig.update_layout(
+    polar=dict(
+        radialaxis=dict(
+            visible=True,
+            range=[0, 1]
+        )
+    ),
+    showlegend=True,
+    legend=dict(
+        title="Legend",
+        orientation="h",
+        yanchor="bottom",
+        y=-0.2,
+        xanchor="center",
+        x=0.5
+    ),
+    margin=dict(l=20, r=20, t=20, b=20)
+)
+
+# Display the radar chart
+st.plotly_chart(fig, use_container_width=True)
+
+# Check if custom product exists before creating diff_df
+if 'custom_product' in st.session_state:
+    custom_product = st.session_state['custom_product']
+    custom_values = custom_product['values']
+    
+    # Get original (unnormalized) user input
+    user_input_original = pd.Series(user_input)
+
+    # Compute dataset average (original values, not normalized)
+    dataset_avg = running_data[valid_features].mean()
+
+    # Create a DataFrame showing differences
+    diff_df = pd.DataFrame({
+        'Feature': valid_features,
+        'Custom Value': user_input_original.values,
+        'Market Average': dataset_avg.values,
+    })
+
+    diff_df['Absolute Diff'] = diff_df['Custom Value'] - diff_df['Market Average']
+    diff_df['% Diff'] = (diff_df['Absolute Diff'] / diff_df['Market Average']) * 100
+
+    st.markdown("### 📊 Difference from Market Average")
+    st.dataframe(
+        diff_df.set_index('Feature')[['Custom Value', 'Market Average', 'Absolute Diff', '% Diff']].style.format({
+            'Custom Value': '{:.2f}',
+            'Market Average': '{:.2f}',
+            'Absolute Diff': '{:+.2f}',
+            '% Diff': '{:+.1f}%'
+        }),
+        use_container_width=True
+    )
+
+    # Find the feature with the max percentage difference
+    max_diff_feature = diff_df.loc[diff_df['% Diff'].abs().idxmax()]
+
+    st.markdown(f"""
+    <div class='insight-box'>
+    <b>Highlight:</b> The custom product differs most in <b>{max_diff_feature['Feature']}</b> 
+    with a <b>{max_diff_feature['% Diff']:+.1f}%</b> difference from the market average.
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <div class='insight-box'>
+    <b>Note:</b> Please create a custom product to see how it compares to the market average.
+    </div>
+    """, unsafe_allow_html=True)
+# Add insight box
+st.markdown("""
+<div class='insight-box'>
+<b>Insight:</b> This radar chart compares the selected product and custom product against the 
+highest-rated products (Audience Rating > 87.5) in each performance category (Everyday, Fast, Race). 
+The dashed lines represent the average feature values of the highest-rated products in each category.
+</div>
+""", unsafe_allow_html=True)
+
 # Footer with methodology note
 st.markdown("""
 ---
