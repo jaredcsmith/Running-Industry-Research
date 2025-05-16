@@ -1046,8 +1046,12 @@ with row3_col2:
 
 row4_col1, row4_col2 = st.columns([3, 1])
 
+
 with row4_col1:
-    st.markdown("### Product Technical Profile")
+    # New Time Series Analysis Plot
+    st.markdown("<h1 style='text-align: left;'>Custom Product - Technical Feature Comparison</h1>", unsafe_allow_html=True)
+
+    st.markdown("### Product Technical Profile (US M9)")
 
     # Filter for selected product
     filtered = running_data.copy()
@@ -1103,8 +1107,8 @@ with row4_col1:
     )
 
     # User Input Form
-    with st.expander("Input Your Own Product Features"):
-        st.markdown("### Enter the values for your custom product:")
+    with st.expander("Input Your Own Product Features "):
+        st.markdown("### Enter the values for your custom product: (US M9)")
         user_input = {}
         for feature in valid_features:
             user_input[feature] = st.number_input(
